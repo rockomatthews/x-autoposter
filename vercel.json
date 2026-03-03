@@ -1,0 +1,28 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate",
+      "schedule": "50 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "30 2 * * *"
+    }
+  ]
+}
