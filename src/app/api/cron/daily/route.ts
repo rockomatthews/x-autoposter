@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireCron } from "../../_lib/cron";
 import { ensureToday, loadSlate, saveSlate } from "../../_lib/state";
 import { postTweet } from "../../_lib/x";
 
-// NOTE: protect this by Vercel cron secret at the platform level.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  requireCron(req);
   const s = loadSlate();
   ensureToday(s);
 
