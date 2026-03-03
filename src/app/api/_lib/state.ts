@@ -1,3 +1,5 @@
+import { kv } from "@vercel/kv";
+
 type SlateState = {
   date: string; // YYYY-MM-DD
   index: number;
@@ -11,25 +13,37 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function loadSlate(): SlateState {
-  if (!process.env.KV_REST_API_URL) {
-    // Fallback: in-memory-ish state via global (not durable, but works without KV).
-    const g: any = globalThis as any;
-    return (
-      g.__SLATE__ || {
-        date: todayISO(),
-        index: 0,
-        posts: [],
-        updatedAt: new Date().toISOString(),
-      }
-    );
-  }
-  throw new Error("KV required for durable slate state (set Vercel KV envs)");
+function emptySlate(): SlateState {
+  return {
+    date: todayISO(),
+    index: 0,
+    posts: [],
+    updatedAt: new Date().toISOString(),
+  };
 }
 
-export function saveSlate(state: SlateState) {
-  const g: any = globalThis as any;
-  g.__SLATE__ = state;
+export async function loadSlate(): Promise<SlateState> {
+  // Vercel serverless functions do NOT share memory. You need KV/Redis for durability.
+  // If KV isn't configured, we fall back to per-instance memory (dev only).
+  const hasKv = !!process.env.KV_REST_API_URL;
+
+  if (!hasKv) {
+    const g: any = globalThis as any;
+    return g.__SLATE__ || emptySlate();
+  }
+
+  const s = (await kv.get(KEY)) as SlateState | null;
+  return s || emptySlate();
+}
+
+export async function saveSlate(state: SlateState) {
+  const hasKv = !!process.env.KV_REST_API_URL;
+  if (!hasKv) {
+    const g: any = globalThis as any;
+    g.__SLATE__ = state;
+    return;
+  }
+  await kv.set(KEY, state);
 }
 
 export function ensureToday(state: SlateState) {
@@ -41,3 +55,5 @@ export function ensureToday(state: SlateState) {
     state.updatedAt = new Date().toISOString();
   }
 }
+
+export type { SlateState };

@@ -9,12 +9,12 @@ export async function POST(req: NextRequest) {
     const posts = Array.isArray(body?.posts) ? body.posts.map((x: any) => String(x || "").trim()).filter(Boolean) : [];
     if (!posts.length) return NextResponse.json({ error: "Missing posts[]" }, { status: 400 });
 
-    const s = loadSlate();
+    const s = await loadSlate();
     ensureToday(s);
     s.posts = posts;
     s.index = 0;
     s.updatedAt = new Date().toISOString();
-    saveSlate(s);
+    await saveSlate(s);
 
     return NextResponse.json({ ok: true, slate: s });
   } catch (e: any) {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     requireAdmin(req);
-    const s = loadSlate();
+    const s = await loadSlate();
     ensureToday(s);
     return NextResponse.json({ ok: true, slate: s });
   } catch (e: any) {

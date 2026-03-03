@@ -5,7 +5,7 @@ import { postTweet } from "../../_lib/x";
 
 export async function GET(req: NextRequest) {
   requireCron(req);
-  const s = loadSlate();
+  const s = await loadSlate();
   ensureToday(s);
 
   if (!s.posts.length) {
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (out.ok) {
     s.index += 1;
     s.updatedAt = new Date().toISOString();
-    saveSlate(s);
+    await saveSlate(s);
   }
 
   return NextResponse.json({ ok: out.ok, postedIndex: s.index - (out.ok ? 1 : 0), out, mode: process.env.POST_MODE || "draft" });

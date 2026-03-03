@@ -3,33 +3,46 @@ import { requireCron } from "../../_lib/cron";
 import { ensureToday, loadSlate, saveSlate } from "../../_lib/state";
 import { llmGenerate } from "../../_lib/openai";
 
-function parsePosts(text: string) {
-  // Expect 5 lines or a JSON array. Be forgiving.
+function extractJsonArray(text: string) {
   const trimmed = text.trim();
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+  // Strip fenced code blocks if present
+  const unfenced = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  // Try direct parse
+  if (unfenced.startsWith("[") && unfenced.includes("]")) {
+    const start = unfenced.indexOf("[");
+    const end = unfenced.lastIndexOf("]");
+    const candidate = unfenced.slice(start, end + 1);
     try {
-      const arr = JSON.parse(trimmed);
-      if (Array.isArray(arr)) {
-        return arr.map((x) => String(x || "").trim()).filter(Boolean);
-      }
+      const arr = JSON.parse(candidate);
+      if (Array.isArray(arr)) return arr;
     } catch {
       // ignore
     }
   }
+  return null;
+}
 
-  const lines = trimmed
+function parsePosts(text: string) {
+  const arr = extractJsonArray(text);
+  if (arr) return arr.map((x) => String(x || "").trim()).filter(Boolean);
+
+  // Fallback: line-splitting
+  return text
+    .trim()
     .split(/\r?\n/)
     .map((l) => l.replace(/^\s*[-*\d.)]+\s*/, "").trim())
-    .filter(Boolean);
-
-  return lines;
+    .filter((l) => l && !l.startsWith("```"));
 }
 
 export async function GET(req: NextRequest) {
   try {
     requireCron(req);
 
-    const s = loadSlate();
+    const s = await loadSlate();
     ensureToday(s);
 
     const brand = process.env.BRAND_HANDLE || "@TheBotTeamHQ";
@@ -38,7 +51,7 @@ export async function GET(req: NextRequest) {
     // Call #1: generate slate
     const draft = await llmGenerate({
       system:
-        "You write concise, high-integrity tweets for a crypto-native builder brand. No promises of returns. No price talk. No financial advice. Avoid 'soon'.",
+        "You write concise, high-integrity tweets for a crypto-native builder brand. Return ONLY raw JSON (no markdown, no code fences). No promises of returns. No price talk. No financial advice. Avoid 'soon'.",
       user:
         `Generate exactly 5 standalone tweets for ${brand}.\n\nTheme: BOTSQUAD = social integrity + access utility + locked drops + x402 pay-per-tool-call.\n\nRequirements:\n- Each tweet <= 240 chars\n- Include portal URL in at most 2 tweets: ${portalUrl}\n- Mention x402/pay-per-call in at least 1 tweet\n- Mention integrity checklist in at least 1 tweet\n- No hype-y claims like 'makes money on autopilot'\n\nReturn as JSON array of 5 strings.`,
       temperature: 0.55,
@@ -48,7 +61,7 @@ export async function GET(req: NextRequest) {
     // Call #2: polish + compliance
     const polished = await llmGenerate({
       system:
-        "You are a strict editor. Ensure each tweet is clear, truthful, <=240 chars, no promises, no financial advice, no 'guaranteed', no '20x'.",
+        "You are a strict editor. Ensure each tweet is clear, truthful, <=240 chars, no promises, no financial advice, no 'guaranteed', no '20x'. Return ONLY raw JSON array (no markdown, no code fences).",
       user:
         `Clean up this list to comply. Keep exactly 5 tweets. Output JSON array only.\n\n${draft}`,
       temperature: 0.2,
@@ -66,7 +79,7 @@ export async function GET(req: NextRequest) {
     s.posts = posts;
     s.index = 0;
     s.updatedAt = new Date().toISOString();
-    saveSlate(s);
+    await saveSlate(s);
 
     return NextResponse.json({ ok: true, slate: s, mode: process.env.POST_MODE || "draft" });
   } catch (e: any) {
