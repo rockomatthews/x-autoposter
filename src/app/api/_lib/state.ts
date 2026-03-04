@@ -7,7 +7,18 @@ type SlateState = {
   updatedAt: string;
 };
 
+type RepliesState = {
+  date: string; // YYYY-MM-DD
+  count: number;
+  sinceId?: string;
+  updatedAt: string;
+};
+
 const KEY = "x-autoposter-slate";
+const REPLIES_KEY = "x-autoposter-replies";
+function repliedSetKey(date: string) {
+  return `x-autoposter-replied:${date}`;
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);

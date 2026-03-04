@@ -21,7 +21,7 @@ function nonce() {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
 
-export async function postTweet(text: string) {
+export async function postTweet(text: string, opts?: { inReplyToTweetId?: string }) {
   const mode = (process.env.POST_MODE || "draft").toLowerCase();
   if (mode !== "live") {
     return { ok: true, mode: "draft", wouldPost: text };
@@ -62,13 +62,18 @@ export async function postTweet(text: string) {
       .map(([k, v]) => `${pct(k)}=\"${pct(v)}\"`)
       .join(", ");
 
+  const body: any = { text };
+  if (opts?.inReplyToTweetId) {
+    body.reply = { in_reply_to_tweet_id: opts.inReplyToTweetId };
+  }
+
   const res = await fetch(url, {
     method,
     headers: {
       authorization: authHeader,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(body),
   });
 
   const json = await res.json().catch(() => ({}));
